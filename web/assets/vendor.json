@@ -1,0 +1,10 @@
+{
+  "vendor/mujoco/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  "vendor/mujoco/mujoco.js": "bc6980e4bc5ee5f809a6cabde0743798637e113d333f9e85124714d42be1ccae",
+  "vendor/mujoco/mujoco.wasm": "2d380f1070a556c3003b4a7c7c10c98a5f61db4e91815de1075ec478e9487e76",
+  "vendor/three/LICENSE": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc",
+  "vendor/three/build/three.core.js": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6",
+  "vendor/three/build/three.module.js": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea",
+  "vendor/three/examples/jsm/controls/OrbitControls.js": "3d79d07ecb686b4e5d93232eedab255331c1beef711e13164eaa1f68655a5f2b",
+  "vendor/three/examples/jsm/controls/TransformControls.js": "151befe25bb0d68626f9a6b033625b7b0cf6848e39ba71623b7bed8e3df565d6"
+}

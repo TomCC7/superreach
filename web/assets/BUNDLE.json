@@ -1,0 +1,104 @@
+{
+  "policy": {
+    "path": "models/policy_trimode_dual_enc_10ms_13500.onnx",
+    "input": {
+      "obs": [
+        1,
+        318
+      ]
+    },
+    "output": {
+      "q_des": [
+        1,
+        6
+      ]
+    }
+  },
+  "model_sha256": "8ac35d59dc94d04361286e7ac07679da2e623c60ea458d4ef6e0513482cea98f",
+  "checkpoints": {
+    "stable-critic@10k": {
+      "path": "models/policy_eef_direct_stable_critic_10k.onnx",
+      "sha256": "d93c9b497427c020c2d41ed2af5725b0bd442cb03f03adf51549aca1398ad1a4",
+      "js": {
+        "path": "models/js/policy-89de819617dccae08e63.graph.json",
+        "sha256": "89de819617dccae08e63ce7a8a095895ec1acec96fa154b3286a15d9c5080776"
+      }
+    },
+    "stable-ft-v1@16k": {
+      "path": "models/policy_eef_direct_stable16k.onnx",
+      "sha256": "7d57aa9a1fcf114335e04f2c325e45530f3c9eae7ff7f1c4d93b9d54b84c6f95",
+      "js": {
+        "path": "models/js/policy-cfa8c06c427ab1b46548.graph.json",
+        "sha256": "cfa8c06c427ab1b465481900e6a90af0e84843d5f64abf36cceba2a4fa3ed98f"
+      }
+    },
+    "direct_u@14k": {
+      "path": "models/policy_eef_direct_14k.onnx",
+      "sha256": "7ea604e89a19e35c93db104a734eb62db753f141ed9b520fa83c4be9057df987",
+      "js": {
+        "path": "models/js/policy-1f40c6012ec3f84f694b.graph.json",
+        "sha256": "1f40c6012ec3f84f694b3c381926d9ec7ea38d6fec2d802b63fc511a74382f7d"
+      }
+    },
+    "noise-dr-10ms@11.5k": {
+      "path": "models/policy_eef_direct_noise_dr_10ms_11.5k.onnx",
+      "sha256": "5de4bef7c67e85e3a3d175327dee75a7a0ee5cdb723457410c7cdd5c099ac1b0",
+      "js": {
+        "path": "models/js/policy-c236c916c1cd423ee2de.graph.json",
+        "sha256": "c236c916c1cd423ee2de534c4a296e1438b8a7702a3bf4dbb73a013a0ee352e7"
+      }
+    },
+    "no-pose-ablation@13k": {
+      "path": "models/policy_eef_direct_no_pose_ablation_13k.onnx",
+      "sha256": "830e131c853041bd640211052812acc7426e95ee0556e7734969696d39e16cfe",
+      "js": {
+        "path": "models/js/policy-cf232ba18b3c5b4255c8.graph.json",
+        "sha256": "cf232ba18b3c5b4255c8d7165f886ed5f8bc58f44b54ae57fe29f8045c679dd5"
+      }
+    },
+    "smooth-approach-10ms@14k": {
+      "path": "models/policy_eef_direct_smooth_approach_10ms_14k.onnx",
+      "sha256": "1893110b9e548129db8f3cf53f7ad5531da1a5d8188ae40bf1795f3f50fe4f84",
+      "js": {
+        "path": "models/js/policy-c632d1b9ee758f828f5c.graph.json",
+        "sha256": "c632d1b9ee758f828f5c75e71061c17d0da9c78e1206c164c03f558ffcbd1c35"
+      }
+    },
+    "tri-mode-dual-enc@13.5k": {
+      "path": "models/policy_trimode_dual_enc_10ms_13500.onnx",
+      "sha256": "8ac35d59dc94d04361286e7ac07679da2e623c60ea458d4ef6e0513482cea98f",
+      "abi": "tri-mode-v2",
+      "js": {
+        "path": "models/js/policy-9fedd8a81aa14f18fa9c.graph.json",
+        "sha256": "9fedd8a81aa14f18fa9c66de6f224a9025f3cd0d80075b688f0a900da6b70dc2"
+      }
+    }
+  },
+  "default_checkpoint": "tri-mode-dual-enc@13.5k",
+  "files": {
+    "scene.xml": "26d7bc3f6472644efa4bb6bd50c47b7cf55545344750ee56b2c10827a458c441",
+    "meshes/arm_link_1.obj": "caf2717824f436a50965e5c288d66a3522101db35db787e8369dfd3ce50548de",
+    "meshes/arm_link_1_collision.stl": "bfc758cece526bc432e796fb7f95af46abec6222ce30f702d624c69ca0cd5010",
+    "meshes/arm_link_2.obj": "8f14d29d6b2cf5b7dcb124f49bc456c3605a481f563a69260fde2b1c2c3c17a4",
+    "meshes/arm_link_2_collision.stl": "e9f0480fa82dcd3b077e0f98d3962d72c558dd5a6226c27b1cc82e8733537233",
+    "meshes/arm_link_3_0.obj": "d5b9f9f10eeff49fd58dc429f398df62b29077666e6ecf11ea7c48ab7438f401",
+    "meshes/arm_link_3_1.obj": "c40884b7073be7c8ee4d8ad6682dba676f5523dc24699037deea7c1d0b36c999",
+    "meshes/arm_link_3_collision.stl": "270e3e5b35b2b31c91954225c95d95b07dca956710fa25c90ae223fd18b4337b",
+    "meshes/arm_link_4_0.obj": "187d732576a3b6c84f11f10ab7e4cf1bd92cda7ab67cbd2376bcc6fb2c632edc",
+    "meshes/arm_link_4_1.obj": "dff950d1174e37dfff9fe482022b39ecdfc861b4e651adc52e2f7673f95b815b",
+    "meshes/arm_link_4_collision.stl": "82adcd5f70a25381c0c654469af76626f7a460f67360e8bfcd56dc592a86c345",
+    "meshes/arm_link_5.obj": "eceb3d38cbaf87771f83f92d228a9944cee561376a8119e04bfab5ed205c498e",
+    "meshes/arm_link_5_collision.stl": "f554fa375ca8e7363dc43436736576b32bc38b156016339eacd7a2487ae24fcd",
+    "meshes/arm_link_6.obj": "40cb9d0ac016dda4212b7e74d8db6a7f32fb97dc91746510f0f6e06934c40781",
+    "meshes/arm_link_6_collision.stl": "202372b316fa285084efdf935c5883bca7811f00228998889e0e004d4f947e8b",
+    "meshes/base_0.obj": "def57e94c7a786b0c7e2f1087f79ef9717b8cdc0e4939f99bed2db3469fdf1e8",
+    "meshes/base_1.obj": "14e64384bb75cb3d743811b05fbbb81395d829e02fadb0708426a98b357320f1",
+    "meshes/base_collision.stl": "4275bf78a794a1427fdc54f12d524ef8f7c9ad2cb4dfd70cd4e8d1fdad0f327a",
+    "meshes/hand.obj": "002ba43c755bce7b8a91623a6d4b8953595f8f087f05674afe4891097b0d9e89",
+    "meshes/hand_collision.stl": "9e286caf81e3c4bcd58b1a36da0b0b0a2066c5b0ba12d059b9942c8293197caa",
+    "meshes/hand_left_finger.obj": "403b26f0cf132642935a95bdc2d5cbf3cea9e5717cf3edac4c3663130f30da26",
+    "meshes/hand_left_finger_collision.stl": "73283fb06c106e1f25d2ce943cd7b9e9d9d624db6601e0bb893f3912244d9ce2",
+    "meshes/hand_right_finger.obj": "2f7dd627b7c7f471fa3a5501dde8dddc2abd5d33a6a08a66ead232f14aae88b4",
+    "meshes/hand_right_finger_collision.stl": "bcce48a57a561930f36ac74b903c1c27d00cca2c15ef2e4177eb5ee47048389c"
+  }
+}

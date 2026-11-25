@@ -1,0 +1,10 @@
+SuperReach
+Copyright 2026 the SuperReach contributors
+
+SuperReach source is provided under the Apache License, Version 2.0.
+
+The optional browser runtime uses MuJoCo (Apache-2.0) and Three.js (MIT).
+Their distribution files and license texts are supplied separately. The
+simulation uses the OpenYAM robot description and meshes, revision
+f9853344bbc9fa00aade6ff3ffb7db6532d185e1. The assets are not included or
+licensed by this repository. Supply assets that you have permission to use.

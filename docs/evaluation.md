@@ -1,0 +1,7 @@
+# Evaluation protocol
+
+The archived native evaluation used `tri-mode-dual-enc@13.5k`. Both conditions used the same 13 standard cases per modality: HOME, TRACK, and STEP at payloads up to 2 kg. The control period was 20 ms, with ten 2 ms physics substeps. The noisy condition injected sensor bias and noise and withheld each new command for the first five substeps. The archived summary averages per-case means and per-case P95 values separately instead of pooling ticks.
+
+Each mode scores a different control objective. Orientation is explicit only in EEF 6D. Joint error relative to the reference posture is the primary measure for Joint 6D and is only descriptive for Cartesian modes. The full-suite TCP P95 includes large STEP acquisitions; it is not a steady-state error bound. The archival receipt identifies the source and update count but does not itself hash the evaluated weights.
+
+The portable evaluator runs paired synthetic trajectories on a separately supplied native MuJoCo scene. It reports position, orientation, joint error, command slew, and joint acceleration; joint STEP cases also report overshoot and off-HOME tail motion. These results are for local verification, not a recreation of the archived benchmark. The reference trainer uses the production actor, objective, delay and noise rules, and a simplified CPU world model and critic loop. The original GPU launcher, production optimizer stack, and registered trajectory bank are outside this checkout.

@@ -1,0 +1,12 @@
+# Historical training environment: Linux x86-64, Python 3.13, CUDA 13.0.
+# Install the CUDA 13.0 PyTorch wheel first (see docs/gpu-training.md).
+# mjlab is installed separately; the reference run used a source checkout.
+torch==2.14.1
+warp-lang==1.14.0
+mujoco==3.11.0
+mujoco-warp==3.11.0
+tensordict==0.15.4
+scipy==1.18.1
+numpy==2.5.1
+rsl-rl-lib==5.5.1
+huggingface_hub

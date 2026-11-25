@@ -2,7 +2,7 @@
 
 SuperReach is a learned 50 Hz controller for tracking arm goals on OpenYAM in simulation.
 
-[Live Demo](https://huggingface.co/spaces/playercc7/superreach) on Hugging Face (requires Space access).
+[Live Demo](https://huggingface.co/spaces/playercc7/superreach) (requires Space access) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data)
 
 ![SuperReach browser simulator](docs/preview.png)
 
@@ -39,6 +39,17 @@ python -m superreach.train --scene "$SCENE" --updates 2 --output run/actor.pt
 python -m superreach.evaluate --scene "$SCENE" --checkpoint run/actor.pt --output run/eval.json
 python -m superreach.export --scene "$SCENE" --checkpoint run/actor.pt --output run/actor.onnx
 ```
+
+## GPU reproduction
+
+Install the [GPU requirements and mjlab](docs/gpu-training.md), then run:
+
+```sh
+python scripts/download_artifacts.py
+python gpu_train/run_train.py --data-dir ./data --out-dir ./runs/tri_mode
+```
+
+The GPU trainer starts from scratch. See [data generation](data_gen/README.md) to regenerate the trajectory bank and payload catalog.
 
 ## Repository layout
 

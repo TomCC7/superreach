@@ -16,6 +16,11 @@ venv/
 *.obj
 *.stl
 run/
+/runs/
+/data/
+/.venv-gpu/
+*.tar
+*.tar.gz
 build/
 dist/
 artifacts/

@@ -8,3 +8,7 @@ Their distribution files and license texts are supplied separately. The
 simulation uses the OpenYAM robot description and meshes, revision
 f9853344bbc9fa00aade6ff3ffb7db6532d185e1. The assets are not included or
 licensed by this repository. Supply assets that you have permission to use.
+
+The GPU learner includes portions of SuperMimic, copyright (c) 2026
+ETH Zurich, Chong Zhang. See third_party/SuperMimic-LICENSE.txt for the
+MIT license covering these files.

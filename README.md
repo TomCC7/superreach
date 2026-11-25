@@ -49,13 +49,18 @@ python scripts/download_artifacts.py
 python gpu_train/run_train.py --data-dir ./data --out-dir ./runs/tri_mode
 ```
 
-The GPU trainer starts from scratch. See [data generation](data_gen/README.md) to regenerate the trajectory bank and payload catalog.
+The GPU trainer starts from scratch. See [data generation](data_gen/README.md) to regenerate the trajectory bank and payload catalog, or [Adapt to a New Arm](docs/adapt-to-a-new-arm.md) to port the pipeline.
 
 ## Repository layout
 
 - [`superreach/`](superreach/): policy, training, evaluation, and export.
 - [`web/`](web/) and [`tools/`](tools/): browser simulator and build tools.
 - [`tests/`](tests/) and [`docs/`](docs/): smoke tests and setup notes.
+
+## Acknowledgements
+
+- [SuperMimic](https://supermimic.github.io/) informed the GPU training architecture: a differentiable world model and backpropagation through time for policy updates. The GPU learner also incorporates components credited to ETH Zurich and Chong Zhang in [NOTICE](NOTICE).
+- [PolicyIK](https://tinaliu0123.github.io/PolicyIK/) inspired SuperReach's formulation of end-effector tracking as policy-based inverse kinematics.
 
 ## License & notice
 

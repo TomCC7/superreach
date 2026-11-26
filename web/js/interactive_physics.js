@@ -3,13 +3,15 @@ import {geomSnapshot,copyGeoms} from './runtime_timing.mjs?v=macos-opt-v1';
 const PARK=[0,0,-5], POKE_STEPS=75;
 export const obstacleXml=`<body name="demo_obstacle" mocap="true" pos="${PARK.join(' ')}">${Object.entries(shapes).map(([name,{type,size}])=>`<geom name="demo_${name}" type="${type}" size="${size.join(' ')}" group="3" contype="2" conaffinity="1" priority="1" friction=".5 .005 .0001"/>`).join('')}</body>`;
 export class Interactions {
- constructor(mj){this.mj=mj;this.force=new mj.DoubleBuffer(6);this.on=false;this.shape='wall';this.material='rigid';this.pos=obstacleHome.slice();this.moveId=null;this.ghost=false;this.builds=0;this.pokeId=0;this.poke=null;}
- bind(m,d,tcp){
+ constructor(mj,home=obstacleHome){this.mj=mj;this.force=new mj.DoubleBuffer(6);this.on=false;this.shape='wall';this.material='rigid';this.pos=home.slice();this.moveId=null;this.ghost=false;this.builds=0;this.pokeId=0;this.poke=null;}
+ dispose(){this.force.delete();}
+ bind(m,d,hand,tcp,elbow){
+  this.site=tcp;
   this.m=m;this.d=d;this.ghostFrame=null;this.builds++;
   const name=(type,n)=>this.mj.mj_name2id(m,this.mj.mjtObj[type].value,n);
   this.ids=Object.fromEntries(Object.keys(shapes).map(s=>[s,name('mjOBJ_GEOM',`demo_${s}`)]));
   this.mocap=3*m.body_mocapid[name('mjOBJ_BODY','demo_obstacle')];
-  this.bodies={tcp,elbow:name('mjOBJ_BODY','arm_link_3')};
+  this.bodies={tcp:hand,elbow:name('mjOBJ_BODY',elbow)};
   if([...Object.values(this.ids),this.mocap,this.bodies.elbow].some(i=>i<0))throw Error('Missing interaction model element');
   this.configure({});
   // Preserve an in-flight poke across payload-only recompilation.
@@ -37,7 +39,16 @@ export class Interactions {
   if(this.poke?.remaining||!Object.hasOwn(this.bodies,target)||![15,30,50].includes(magnitude))return;
   this.poke={id:++this.pokeId,target,force:[0,magnitude,0],remaining:POKE_STEPS};this.writePoke();
  }
- writePoke(){this.d.xfrc_applied.set(this.poke.force,6*this.bodies[this.poke.target]);}
+ writePoke(){
+  const {d,poke}=this,body=this.bodies[poke.target],i=6*body;
+  d.xfrc_applied.set(poke.force,i);
+  if(poke.target==='tcp'&&this.site>=0){
+   // xfrc_applied is a world-frame wrench about the hand COM. Shift the +Y force to the TCP site.
+   const p=3*this.site,b=3*body,fy=poke.force[1];
+   d.xfrc_applied.set([-(d.site_xpos[p+2]-d.xipos[b+2])*fy,0,(d.site_xpos[p]-d.xipos[b])*fy],i+3);
+  }
+ }
+ beforeSubstep(){if(this.poke?.remaining)this.writePoke();}
  afterSubstep(){
   if(this.poke?.remaining&&--this.poke.remaining===0)this.d.xfrc_applied.fill(0,6*this.bodies[this.poke.target],6*this.bodies[this.poke.target]+6);
  }
@@ -72,6 +83,6 @@ export class Interactions {
   const body=poke?this.bodies[poke.target]:0;
   return {ghost,torqueSat,contacts:this.contacts(),
    obstacle:{on:this.on,shape:this.shape,material:this.material,position:this.pos,physicalPosition:Array.from(d.mocap_pos.slice(this.mocap,this.mocap+3)),moveId:this.moveId,builds:this.builds},
-   poke:poke?{...poke,steps:POKE_STEPS-poke.remaining,position:Array.from(d.xipos.slice(3*body,3*body+3)),applied:Array.from(d.xfrc_applied.slice(6*body,6*body+6))}:null};
+   poke:poke?{...poke,steps:POKE_STEPS-poke.remaining,position:Array.from(poke.target==='tcp'&&this.site>=0?d.site_xpos.slice(3*this.site,3*this.site+3):d.xipos.slice(3*body,3*body+3)),applied:Array.from(d.xfrc_applied.slice(6*body,6*body+6))}:null};
  }
 }

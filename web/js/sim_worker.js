@@ -1,12 +1,14 @@
+import {robots,robotId} from './robots.js?v=unified-v1';
 import {Interactions,obstacleXml} from './interactive_physics.js?v=macos-opt-v1';
 import {TraceRing,nextDeadline,geomSnapshot,copyGeoms} from './runtime_timing.mjs?v=macos-opt-v1';
 let interactions;
 import loadMujoco from '../vendor/mujoco/mujoco.js';
-import {Float32Engine} from './mlp_infer.mjs?v=e6-submm-20k';
-import {Policy,KP,KD,HOME,DT} from './policy.js?v=e6-submm-20k';
+import {Float32Engine} from './mlp_infer.mjs?v=js-f32-v1';
+import {Policy,DT} from './policy.js?v=metal-arm-v1';
 import {periodicReference} from './trajectories.js?v=scheme1-14k-v1';
-let mj,m,d,ref,policy,tcp,xml,ready=false,running=false,busy=false,timer,trace,geomsFrame,qref=HOME.slice(),preset='reach',payload=0;
+let mj,m,d,ref,policy,tcp,hand,xml,payloads,baseMass,payloadBody,ready=false,running=false,busy=false,timer,trace,geomsFrame,qref=[],preset='reach',payload=0;
 const SUBSTEPS=10, PHYSICS_DT=0.002;
+let robot,HOME,KP,KD,PEAK;
 let checkpoints,activeCheckpoint,mode=0,manualPose=null,jointAck=0;
 const limits=()=>Array.from(ikLower,(lo,i)=>[lo,ikUpper[i]]);
 const boundQ=(q)=>Array.from(q,(x,i)=>Math.max(ikLower[i],Math.min(ikUpper[i],x)));
@@ -27,9 +29,17 @@ function sampleTick(now){
 }
 const send=(type,fields={})=>postMessage({type,...fields});
 const arr=(a)=>Array.from(a);
-async function bytes(path){const r=await fetch(new URL('../'+path+'?v=e6-submm-20k',import.meta.url));if(!r.ok)throw Error(`${path}: HTTP ${r.status}`);return new Uint8Array(await r.arrayBuffer());}
+async function bytes(path){const r=await fetch(new URL('../'+path+'?v=js-f32-v1',import.meta.url));if(!r.ok)throw Error(`${path}: HTTP ${r.status}`);return new Uint8Array(await r.arrayBuffer());}
 async function checked(path,expected){const b=await bytes(path);if(expected&&globalThis.crypto?.subtle?.digest){const hash=arr(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',b))).map(x=>x.toString(16).padStart(2,'0')).join('');if(hash!==expected)throw Error('Hash mismatch '+path);}return b;}
-function pose(data=ref){return [...data.xpos.slice(3*tcp,3*tcp+3),...data.xquat.slice(4*tcp,4*tcp+4)];}
+function matQuat(a){
+  const tr=a[0]+a[4]+a[8]; let w,x,y,z,s;
+  if(tr>0){s=2*Math.sqrt(1+tr);w=s/4;x=(a[7]-a[5])/s;y=(a[2]-a[6])/s;z=(a[3]-a[1])/s;}
+  else if(a[0]>=a[4]&&a[0]>=a[8]){s=2*Math.sqrt(1+a[0]-a[4]-a[8]);w=(a[7]-a[5])/s;x=s/4;y=(a[1]+a[3])/s;z=(a[2]+a[6])/s;}
+  else if(a[4]>=a[8]){s=2*Math.sqrt(1+a[4]-a[0]-a[8]);w=(a[2]-a[6])/s;x=(a[1]+a[3])/s;y=s/4;z=(a[5]+a[7])/s;}
+  else{s=2*Math.sqrt(1+a[8]-a[0]-a[4]);w=(a[3]-a[1])/s;x=(a[2]+a[6])/s;y=(a[5]+a[7])/s;z=s/4;}
+  return [w,x,y,z];
+}
+function pose(data=ref){if(tcp<0)return [...data.xpos.slice(3*hand,3*hand+3),...data.xquat.slice(4*hand,4*hand+4)];return [...data.site_xpos.slice(3*tcp,3*tcp+3),...matQuat(data.site_xmat.slice(9*tcp,9*tcp+9))];}
 function fk(q){ref.qpos.set(q,0);mj.mj_kinematics(m,ref);return pose();}
 function geometry(){const out=[];for(let g=0;g<m.ngeom;g++){
  if(m.geom_group[g]===3)continue;
@@ -39,12 +49,12 @@ function geometry(){const out=[];for(let g=0;g<m.ngeom;g++){
  out.push(item);
  }return out;}
 // Policy input uses tick t; UI/scoring use the current post-physics tick.
-function currentGoal(){if(preset!=='hold'&&preset!=='manual'){qref=periodicReference(preset,policy.tick*DT,HOME).q;return fk(qref);}return policy.tri&&mode!==2&&manualPose?manualPose:fk(qref);}
+function currentGoal(){if(preset!=='hold'&&preset!=='manual'){qref=periodicReference(preset,policy.tick*DT,robot).q;return fk(qref);}return policy.tri&&mode!==2&&manualPose?manualPose:fk(qref);}
 function state(goal=currentGoal(),packStart=null,tcpPose=pose(d)){
  const qDes=policy.tick?arr(d.ctrl.subarray(0,6)):null;
  const frame={type:'state',...interactions.state(ref,qDes),...copyGeoms(d,geomsFrame),tick:policy.tick,time:d.time,
   q:arr(d.qpos.subarray(0,6)),dq:arr(d.qvel.subarray(0,6)),q_des:qDes,tcp:tcpPose,goal,qref,mode,tri:policy.tri,jointAck,
-  running,payload,preset,checkpoint:activeCheckpoint,backend:policy.engine.backend,infer_ms:inferMs,step_ms:stepMs,
+  running,payload,robot:robot.id,massApplied:payloads?m.body_mass[hand]-baseMass:(payload?m.body_mass[payloadBody]:0),preset,checkpoint:activeCheckpoint,backend:policy.engine.backend,infer_ms:inferMs,step_ms:stepMs,
   phys_ms:physMs,ik_ms:ikMs,timer_late_ms:lateMs,tick_hz:running?tickHz:0};
  if(packStart!==null){
   packMs=performance.now()-packStart;
@@ -55,36 +65,59 @@ function state(goal=currentGoal(),packStart=null,tcpPose=pose(d)){
  // Structured clone snapshots the compact backing buffers; never detach WASM or reuse detached buffers.
  postMessage(frame);
 }
-function build(mass=0,preserve=false){
- if(!Number.isFinite(mass)||mass<0)throw Error('Invalid payload mass');
- // Recompile inertial constants instead of relying on optional mj_setConst bindings.
- // Preserve measured state AND intended reference/history when only load changes.
- const saved=preserve?{qpos:arr(d.qpos),qvel:arr(d.qvel),ctrl:arr(d.ctrl),warmstart:arr(d.qacc_warmstart),time:d.time}:null;
- if(d)d.delete();if(ref)ref.delete();if(m)m.delete();
- // Verify original bytes first; strip obsolete task props only in memory.
- let source=xml.replace(/meshdir="[^"]*"/,'meshdir="/openyam/meshes"')
- .replace(/<geom\b[^>]*name="(?:table|target_zone)[^"]*"[^>]*\/>/g,'')
- .replace(/<body\b[^>]*name="(?:object|pick_object)"[^>]*>[\s\S]*?<\/body>/g,'');
- source=source.replace('</worldbody>',obstacleXml+'</worldbody>');
- // Training payload: full 40 mm cube at TCP, I/m=0.0002666667 m².
- // A real welded payload contributes mass/inertia; zero keeps the verified scene unchanged.
- if(mass>0)source=source.replace('<site name="arm_tcp_site"',`<body name="demo_payload"><inertial pos="0 0 0" mass="${mass}" diaginertia="${mass*.0002666667} ${mass*.0002666667} ${mass*.0002666667}"/><geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".1 .6 .8 1"/></body><site name="arm_tcp_site"`);
- mj.FS.writeFile('/openyam/scene.xml',source);m=mj.MjModel.from_xml_path('/openyam/scene.xml');d=new mj.MjData(m);ref=new mj.MjData(m);
- tcp=mj.mj_name2id(m,mj.mjtObj.mjOBJ_BODY.value,'arm_tcp');if(tcp<0)throw Error('arm_tcp missing');
- for(let i=0;i<6;i++)if(Math.abs(m.actuator_gainprm[10*i]-KP[i])>1e-6||Math.abs(m.actuator_biasprm[10*i+2]+KD[i])>1e-6)throw Error('PD gain mismatch');
- if(Math.abs(m.opt.timestep-PHYSICS_DT)>1e-12)throw Error('Timestep mismatch');
- const ranges=m.jnt_range;
- for(let i=0;i<6;i++){ikLower[i]=ranges[2*i];ikUpper[i]=ranges[2*i+1];}
- geomsFrame=geomSnapshot(m.ngeom);interactions.bind(m,d,tcp);payload=mass;if(saved){d.qpos.set(saved.qpos);d.qvel.set(saved.qvel);d.ctrl.set(saved.ctrl);d.qacc_warmstart.set(saved.warmstart);d.time=saved.time;mj.mj_forward(m,d);}else reset();send('ready',{geoms:geometry(),timestep:m.opt.timestep,kp:KP,kd:KD,payload,version:mj.mj_versionString(),control_dt:DT,substeps:SUBSTEPS,jointLimits:limits()});state();
+// The Metal Arm has six joints and a fixed tool; its training payload is
+// catalogued as merged hand inertia. Apply only the original scene bodies.
+function setPayload(mass){
+ if(!robot.payloads.includes(mass))throw Error('Invalid payload mass');
+ if(!payloads){build(mass,true);return;}
+ const row=payloads[mass];if(!row)throw Error('Invalid payload mass');
+ for(const key of ['body_mass','body_ipos','body_inertia','body_iquat'])m[key].set(row[key].flat());
+ const scratch=new mj.MjData(m);try{mj.mj_setConst(m,scratch);}finally{scratch.delete();}
+ payload=mass;mj.mj_forward(m,d);
+ if(Math.abs(m.body_mass[hand]-baseMass-mass)>1e-12)throw Error('Payload mass mismatch');
 }
-function reset(){mj.mj_resetData(m,d);interactions.reset();d.qpos.set(HOME);d.qpos[6]=.04;d.qpos[7]=.04;d.ctrl.set(HOME);d.ctrl[6]=.04;mj.mj_forward(m,d);policy.reset(arr(d.qpos.slice(0,6)),arr(d.qvel.slice(0,6)));qref=HOME.slice();manualPose=null;trace=new TraceRing(policy.tri?318:311);inferMs=stepMs=ikMs=physMs=packMs=lateMs=null;averages.fill(null);running=false;}
+function disposePlant(){
+ if(d)d.delete();if(ref)ref.delete();if(m)m.delete();
+ d=ref=m=null;
+}
+function build(mass=0,preserve=false){
+ if(!robot.payloads.includes(mass))throw Error('Invalid payload mass');
+ const saved=preserve?{qpos:arr(d.qpos),qvel:arr(d.qvel),ctrl:arr(d.ctrl),warmstart:arr(d.qacc_warmstart),time:d.time}:null;
+ if(!m||!payloads){
+  disposePlant();
+  let source=xml.replace(/meshdir="[^"]*"/,'meshdir="/'+robot.assets+'/meshes"')
+   .replace(/<geom\b[^>]*name="(?:table|target_zone)[^"]*"[^>]*\/>/g,'')
+   .replace(/<body\b[^>]*name="(?:object|pick_object)"[^>]*>[\s\S]*?<\/body>/g,'');
+  source=source.replace('</worldbody>',obstacleXml+'</worldbody>');
+  if(!payloads&&mass>0){const I=mass*.0002666667;source=source.replace('<site name="arm_tcp_site"',`<body name="demo_payload"><inertial pos="0 0 0" mass="${mass}" diaginertia="${I} ${I} ${I}"/><geom type="box" size=".02 .02 .02" contype="0" conaffinity="0" rgba=".1 .6 .8 1"/></body><site name="arm_tcp_site"`);}
+  const path='/'+robot.assets+'/scene.xml';mj.FS.writeFile(path,source);m=mj.MjModel.from_xml_path(path);d=new mj.MjData(m);ref=new mj.MjData(m);
+  const id=(type,name)=>mj.mj_name2id(m,mj.mjtObj[type].value,name);
+  tcp=robot.tcpSite?id('mjOBJ_SITE',robot.tcpSite):-1;hand=id('mjOBJ_BODY',robot.tcpBody);payloadBody=!payloads&&mass?id('mjOBJ_BODY','demo_payload'):-1;
+  if(hand<0||(robot.tcpSite&&tcp<0)||(!payloads&&mass&&payloadBody<0)||m.nu!==(robot.fingers?7:6)||m.nq!==(robot.fingers?8:6)||m.nv!==m.nq)throw Error('Scene ABI mismatch');
+  if(payloads&&(m.nbody!==payloads[0].body_mass.length+1||m.body_mocapid[m.nbody-1]!==0))throw Error('Payload catalog layout mismatch');
+  baseMass=m.body_mass[hand];
+  for(let i=0;i<6;i++)if(m.actuator_gainprm[10*i]!==KP[i]||m.actuator_biasprm[10*i+2]!==-KD[i]||
+    m.actuator_forcerange[2*i]!==-PEAK[i]||m.actuator_forcerange[2*i+1]!==PEAK[i])throw Error('Actuator mismatch');
+  const servos=(xml.match(/<position\b[^>]*\/>/g)||[]).slice(0,6);
+  if(servos.length!==6||servos.some(s=>!s.includes('ctrllimited="false"')))throw Error('Actuator control limit mismatch');
+  if(Math.abs(m.opt.timestep-PHYSICS_DT)>1e-12)throw Error('Timestep mismatch');
+  const ranges=m.jnt_range;
+  for(let i=0;i<6;i++){ikLower[i]=ranges[2*i];ikUpper[i]=ranges[2*i+1];}
+  geomsFrame=geomSnapshot(m.ngeom);interactions.bind(m,d,hand,tcp,robot.elbow);
+  send('ready',{robot:robot.id,geoms:geometry(),timestep:m.opt.timestep,kp:KP,kd:KD,payload:mass,version:mj.mj_versionString(),control_dt:DT,substeps:SUBSTEPS,jointLimits:limits()});
+ }
+ if(payloads)setPayload(mass);else payload=mass;
+ if(saved){d.qpos.set(saved.qpos);d.qvel.set(saved.qvel);d.ctrl.set(saved.ctrl);d.qacc_warmstart.set(saved.warmstart);d.time=saved.time;mj.mj_forward(m,d);}else reset();
+ state();
+}
+function reset(){mj.mj_resetData(m,d);interactions.reset();d.qpos.set(HOME);d.ctrl.set(HOME);if(robot.fingers){d.qpos[6]=d.qpos[7]=d.ctrl[6]=.04;}mj.mj_forward(m,d);policy.reset(arr(d.qpos.slice(0,6)),arr(d.qvel.slice(0,6)));qref=HOME.slice();manualPose=null;trace=new TraceRing(policy.tri?318:311);inferMs=stepMs=ikMs=physMs=packMs=lateMs=null;averages.fill(null);running=false;}
 // XYZ only. The six leading arm joints are hinges upstream of arm_tcp.
 const ikJ=new Float64Array(18),ikStep=new Float64Array(6),ikQ=new Float64Array(6),ikTrial=new Float64Array(6);
 const ikLower=new Float64Array(6),ikUpper=new Float64Array(6),ikNominal=new Float64Array(6),ikFree=new Uint8Array(6);
 const ikTolerance=1e-5,ikDamping=.003,ikMaxStep=.18;
-function ikPosition(q){ref.qpos.set(q,0);mj.mj_kinematics(m,ref);return ref.xpos;}
+function ikPosition(q){ref.qpos.set(q,0);mj.mj_kinematics(m,ref);return tcp<0?ref.xpos:ref.site_xpos;}
 function ik(target,id){
- const start=performance.now(),q=ikQ,p=3*tcp;
+ const start=performance.now(),q=ikQ,p=3*(tcp<0?hand:tcp);
  q.set(qref);let iterations=0,xyz=ikPosition(q);
  // Prefer the previous branch, with a weak bias toward HOME to limit wrist drift.
  for(let i=0;i<6;i++)ikNominal[i]=.8*q[i]+.2*HOME[i];
@@ -153,8 +186,8 @@ function step(){
 function advance(goal,goal_qref,obs,start,q_des){
  const physicsStart=performance.now();
  // The six MuJoCo position actuators apply Kp*(q_des-q) - Kd*dq.
- inferMs=physicsStart-start;d.ctrl.set(q_des);d.ctrl[6]=.04;
- for(let i=0;i<SUBSTEPS;i++){mj.mj_step(m,d);interactions.afterSubstep();}
+ inferMs=physicsStart-start;d.ctrl.set(q_des);if(robot.fingers)d.ctrl[6]=.04;
+ for(let i=0;i<SUBSTEPS;i++){interactions.beforeSubstep();mj.mj_step(m,d);interactions.afterSubstep();}
  // implicitfast integrates qpos/qvel after computing derived fields. Refresh final-pose
  // geom/TCP and solved contact/actuator forces (including after a poke expires).
  mj.mj_forward(m,d);
@@ -209,18 +242,16 @@ async function loadPolicy(id){
  if(!Object.hasOwn(checkpoints,id))throw Error('Unknown checkpoint');
  const {sha256,abi,js:descriptor}=checkpoints[id];
  const tri=abi==='tri-mode-v2',width=tri?318:311;
- let engine;
- if(descriptor){
-  if(!/^models\/js\/policy-[0-9a-f]{20}\.graph\.json$/.test(descriptor.path))throw Error('Invalid JS checkpoint path');
-  const artifact=JSON.parse(new TextDecoder().decode(await checked(descriptor.path,descriptor.sha256)));
-  if(artifact.onnx_sha256!==sha256||artifact.input!==width||artifact.output!==6||
-     !/^models\/js\/graph-[0-9a-f]{20}\.mjs$/.test(artifact.graph)||
-     !/^models\/js\/weights-[0-9a-f]{20}\.bin$/.test(artifact.weights))throw Error('Invalid JS checkpoint manifest');
-  const [{forward},weights]=await Promise.all([
-   import(new URL('../'+artifact.graph,import.meta.url).href),checked(artifact.weights,artifact.sha256),checked(artifact.graph,artifact.graph_sha256)
-  ]);
-  engine=new Float32Engine(artifact,forward,weights);engine.backend='JS Float32';engine.async=false;
- }else{throw Error('Missing compiled JS policy descriptor');}
+ if(!descriptor||!/^models\/js\/policy-[0-9a-f]{20}\.graph\.json$/.test(descriptor.path))throw Error('Invalid JS checkpoint path');
+ const artifact=JSON.parse(new TextDecoder().decode(await checked(descriptor.path,descriptor.sha256)));
+ if(artifact.onnx_sha256!==sha256||artifact.input!==width||
+    !/^models\/js\/graph-[0-9a-f]{20}\.mjs$/.test(artifact.graph)||
+    !/^models\/js\/weights-[0-9a-f]{20}\.bin$/.test(artifact.weights))throw Error('Invalid JS checkpoint manifest');
+ // Module import stays same-origin and uses a content-addressed immutable path.
+ const [{forward},weights]=await Promise.all([
+  import(new URL('../'+artifact.graph,import.meta.url).href),checked(artifact.weights,artifact.sha256)
+ ]);
+ const engine=new Float32Engine(artifact,forward,weights);engine.backend='JS Float32';engine.async=false;
  const next=new Policy(engine,tri);next.reset(HOME,[0,0,0,0,0,0]);
  try{await next.infer(next.observation([.3,0,.35,1,0,0,0],HOME,0));return next;}
  catch(e){await engine.release?.();throw e;}
@@ -239,17 +270,27 @@ async function selectCheckpoint(id,requestId){
  }
  send('checkpointDone',{id:requestId,checkpoint:activeCheckpoint});
 }
-async function init(requested){send('progress',{message:'Loading MuJoCo WASM and policy…'});mj=await loadMujoco();interactions=new Interactions(mj);
- const bundle=await (await fetch(new URL('../assets/BUNDLE.json?v=e6-submm-20k',import.meta.url))).json();mj.FS.mkdirTree('/openyam/meshes');
- const entries=Object.entries(bundle.files);await Promise.all(entries.filter(([n])=>n.startsWith('meshes/')).map(async([name,hash])=>mj.FS.writeFile('/openyam/'+name,await checked('assets/'+name,hash))));
- xml=new TextDecoder().decode(await checked('assets/scene.xml',bundle.files['scene.xml']));
- checkpoints=bundle.checkpoints;
- activeCheckpoint=Object.hasOwn(checkpoints,requested)?requested:bundle.default_checkpoint;
- policy=await loadPolicy(activeCheckpoint);build(0);ready=true;running=true;schedule();
+async function switchRobot(id,requested){
+ const next=robots[robotId(id)];
+ if(ready&&robot===next)return;
+ ready=running=false;clearTimeout(timer);clearTimeout(targetTimer);targetTimer=null;pendingDrags=[];
+ send('progress',{message:`Loading ${next.name}…`});
+ if(!mj)mj=await loadMujoco();
+ const base=next.assets;
+ const bundle=JSON.parse(new TextDecoder().decode(await bytes(base+'/BUNDLE.json')));
+ mj.FS.mkdirTree('/'+base+'/meshes');
+ await Promise.all(Object.entries(bundle.files).filter(([n])=>n.startsWith('meshes/')).map(async([name,hash])=>mj.FS.writeFile('/'+base+'/'+name,await checked(base+'/'+name,hash))));
+ const scene=new TextDecoder().decode(await checked(base+'/scene.xml',bundle.files['scene.xml']));
+ const catalog=bundle.files['payloads.json']?Object.fromEntries(Object.entries(JSON.parse(new TextDecoder().decode(await checked(base+'/payloads.json',bundle.files['payloads.json'])))).map(([mass,row])=>[Number(mass),row])):null;
+ disposePlant();interactions?.dispose();interactions=new Interactions(mj,next.obstacle);
+ robot=next;HOME=next.home;KP=next.kp;KD=next.kd;PEAK=next.peak;xml=scene;payloads=catalog;
+ checkpoints=bundle.checkpoints;activeCheckpoint=Object.hasOwn(checkpoints,requested)?requested:bundle.default_checkpoint;
+ policy=await loadPolicy(activeCheckpoint);
+ mode=0;preset='reach';jointAck=0;build();ready=true;running=true;schedule();
 }
 let chain=Promise.resolve();onmessage=({data:msg})=>{
  if(msg.type==='target'||msg.type==='jointTarget'||msg.type==='obstacleMove'){
-  if(!ready){send('error',{message:'Not ready'});return;}
+  if(!ready||msg.robot!==robot.id)return;
   const target=msg.type==='target',joint=msg.type==='jointTarget';
   const values=target?msg.pose:joint?msg.q:msg.position;
   const size=joint?6:target&&policy.tri?(msg.mode===0?7:3):3;
@@ -262,7 +303,8 @@ let chain=Promise.resolve();onmessage=({data:msg})=>{
   return;
  }
  chain=chain.then(async()=>{
- if(msg.type==='init')return init(msg.checkpoint);if(!ready)throw Error('Not ready');
+ if(msg.type==='init'||msg.type==='robot'){await whenIdle();return switchRobot(msg.robot,msg.checkpoint);}
+ if(!ready||msg.robot!==robot.id)return;
  // Legacy inference and checkpoint loads can yield to message events.
  await whenIdle();flushTarget();busy=true;
  try{
@@ -274,7 +316,7 @@ let chain=Promise.resolve();onmessage=({data:msg})=>{
  else if(msg.type==='obstacleConfig'){interactions.configure(msg);mj.mj_forward(m,d);state();}
  else if(msg.type==='ghost'){interactions.ghost=msg.on===true;state();}
  else if(msg.type==='poke'){if(running)interactions.startPoke(msg.target,msg.magnitude);state();}
- else if(msg.type==='payload'){build(Number(msg.payload),true);}
+ else if(msg.type==='payload'){setPayload(Number(msg.payload));if(payloads)state();}
  else if(msg.type==='trace')send('trace',{id:msg.id,trace:trace.snapshot(activeCheckpoint)});
  else if(msg.type==='infer'){send('inference',{id:msg.id,q_des:arr(await policy.infer(Float32Array.from(msg.obs)))});}
  else if(msg.type==='test'){running=false;clearTimeout(timer);build(Number(msg.payload||0));preset=msg.preset||'hold';const ticks=msg.ticks||180;for(let i=0;i<ticks;i++){const pending=step();if(pending)await pending;if(pendingDrags.length){busy=false;try{flushTarget();}finally{busy=true;}}}send('testDone',{id:msg.id,trace:trace.snapshot(activeCheckpoint)});}

@@ -1,8 +1,5 @@
 // Causal 311D contract: 16 × [q6, dq6, previous_u6, valid] + [xyz3, quat_wxyz4].
 export const DT = 0.02;
-export const KP = [50,60,50,25,15,10], KD = [3,4,3,2,1,.8];
-export const HOME = [0,1.047,1.047,0,0,0];
-export const RADIUS = [.35,.25,.25,.25,.25,.25];
 export const HISTORY_WIDTH = 16*19, OBS_WIDTH = HISTORY_WIDTH+7;
 export class Policy {
   constructor(engine,tri=false) {

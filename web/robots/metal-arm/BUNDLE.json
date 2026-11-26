@@ -1,0 +1,87 @@
+{
+  "model": "MakerMods Metal Arm",
+  "scene": "scene.xml",
+  "mujoco": "vendored OpenYAM WASM",
+  "home": [
+    0,
+    -1.05,
+    1.45,
+    -0.4,
+    0,
+    0
+  ],
+  "kp": [
+    300,
+    500,
+    500,
+    400,
+    25,
+    20
+  ],
+  "kd": [
+    5,
+    5,
+    5,
+    4,
+    0.2,
+    0.2
+  ],
+  "peak_nm": [
+    30,
+    100,
+    30,
+    10,
+    10,
+    10
+  ],
+  "control_hz": 50,
+  "control_dt": 0.02,
+  "physics_dt": 0.002,
+  "substeps": 10,
+  "command": "direct_u",
+  "modes": [
+    "EEF_6D",
+    "XYZ_ONLY",
+    "JOINT_6D"
+  ],
+  "payload_kg": {
+    "min": 0,
+    "max": 3,
+    "step": null,
+    "model": "centered rigid TCP sphere, 20 mm radius, merged hand inertia",
+    "options": [
+      0,
+      0.5,
+      1,
+      2,
+      3
+    ]
+  },
+  "files": {
+    "meshes/base_link.STL": "852e3baf5704ee5124416aa1b02004a7141f899db1b5788c6a00e6d030bc5fb2",
+    "meshes/gripper_base.STL": "19ab43c406f349d62dc7a9932b66fb28053cf96152ab00d71a93945a43ddd8cd",
+    "meshes/link1.STL": "9cf5c91c6762710af6f0d595b0b8da3b6755ac64b360112b98704851832ae37f",
+    "meshes/link2.STL": "7ad9ec45d5a02f8ae2e22d75b3382e6cac408a436a9a5daf907100b26a3d3268",
+    "meshes/link3.STL": "ea7a0fa4e165ee3f844b0d81615277590d46c98f59ed77fcdf091199134f8986",
+    "meshes/link4.STL": "9d7d54e2c75c7724754ff096645479afd3a27ce754a738637da4fbe7b8d50839",
+    "meshes/link5.STL": "735ec4b2354db355e38b37b7bd86e05d044d228cbc5de00f504a13cc243777a8",
+    "meshes/link6.STL": "39a9bd05ed5bf8d3eb2e6632de2106fb8e87ab445eeb77c6f174c6cf66a0c2ec",
+    "meshes/link7.STL": "3c813623f4c273bfb6f4fd483fc8ee23dc4325de32e9d89d7c44cb1a0e97c033",
+    "meshes/link8.STL": "62d0ed4072aea7e4d0655e16edbf8243317e3e106996f00f06e72afc78d091ec",
+    "payloads.json": "840d1f378c38883b33ac63843b2850d31ce067ca8baf8351d2e1a76e87636c4b",
+    "scene.xml": "5b18715457ab890f5801bdf0ce0e2aad9d0c6eda6162821d8f495f2727b7bde3"
+  },
+  "default_checkpoint": "metal-stage2@20k",
+  "checkpoints": {
+    "metal-stage2@20k": {
+      "sha256": "9717c18209986098f437c3f5d831c5d24317500327dec1861a2f07df98e5e85c",
+      "checkpoint_sha256": "337b0ae97d539e519ba84cd20d4875408b670041b6242eed3e7cadaeabf56b0a",
+      "source_digest": "0b0640a8ad614929fa0a1edb7b0a38d380cc62b1ca49e7609e7b97681afb3293",
+      "abi": "tri-mode-v2",
+      "js": {
+        "path": "models/js/policy-3c43df23c596679d073a.graph.json",
+        "sha256": "3c43df23c596679d073aba29d814b4761cbc50c9c080419a2e0b951ee692f332"
+      }
+    }
+  }
+}

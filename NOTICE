@@ -12,3 +12,10 @@ licensed by this repository. Supply assets that you have permission to use.
 The GPU learner includes portions of SuperMimic, copyright (c) 2026
 ETH Zurich, Chong Zhang. See third_party/SuperMimic-LICENSE.txt for the
 MIT license covering these files.
+
+MakerMods Metal Arm meshes and robot description are derived from
+https://github.com/makermods-robotics/metal-python-ros (revision
+bccf3c82a21453a7b1784a94966456e16ff0f008), copyright (c) 2025 MakerMods,
+under the MIT license (upstream metal_sdk/LICENSE; reproduced at
+web/robots/metal-arm/LICENSE). The MuJoCo scene is adapted for simulation.
+The Git checkout does not include these meshes or model weights.

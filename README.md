@@ -1,19 +1,20 @@
 # SuperReach
 
-SuperReach is a learned 50 Hz controller for tracking arm goals on OpenYAM in simulation.
+SuperReach is a learned 50 Hz controller for tracking arm goals in simulation. The unified browser sandbox runs **OpenYAM** and **MakerMods Metal Arm** with live switching and no page reload.
 
-[Live Demo](https://huggingface.co/spaces/playercc7/superreach) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data) · [Evaluation](docs/evaluation.md)
+[Live Demo](https://huggingface.co/spaces/playercc7/superreach) · [Open Metal Arm directly](https://playercc7-superreach.static.hf.space/?robot=metal-arm) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data) · [Evaluation](docs/evaluation.md)
 
-![SuperReach browser simulator](docs/preview.png)
+![SuperReach browser simulator with MakerMods Metal Arm selected](docs/preview-metal-arm.png)
 
 ## Key highlights
 
 - One 50 Hz policy tracks **EEF 6D** (position and orientation), **XYZ-only** (position), or **Joint 6D** (joint angles).
 - The policy sends six absolute joint positions, `q_des`, directly to the simulator's position actuators without an output clamp, an interpolator, or external inverse kinematics.
-- The browser runs `e6-submm@20k` in JavaScript with MuJoCo WASM, no inference server, and simulated payloads from 0 to 2 kg.
+- Both policies run in Float32 JavaScript with MuJoCo WASM and no inference server. OpenYAM (`e6-submm@20k`) simulates payloads up to 2 kg; Metal Arm (`metal-stage2@20k`) up to 3 kg.
+- **Metal Arm Stage 2 (20k):** clean EEF 6D median **0.83 mm**, HOME mean **0.39 mm** (XYZ-only HOME **0.25 mm**); full hardware domain randomization EEF 6D mean **9.60 mm** and median **2.54 mm**, with **0/129** physical failure flags in native simulation. At 0/1.5/3 kg, a separate EEF 6D HOME hold scored **0.293 / 0.210 / 0.276 mm**, versus **5.968 / 16.806 / 27.788 mm** for raw PD. The 3 kg simulation reaches actuator torque caps; it is **not a hardware load rating**. See the [Metal Arm evaluation](docs/metal-arm.md).
 - In clean native MuJoCo HOME holds, mean tool-center-point (TCP) error after the first second was **0.72 mm** for EEF 6D and **0.38 mm** for XYZ-only. These stationary results cover four payloads per mode. The evaluator recorded **0 physical failures across 129 case/mode runs**. See the [evaluation protocol and raw results](docs/evaluation.md); these are simulation results, not hardware validation or moving-target error bounds.
 
-## Model architecture
+## OpenYAM model architecture
 
 ![E6 sub-mm 20k actor: causal history, online SysID, and two goal encoders feed a shared decoder; the DR head and world model are training-only](docs/architecture.png)
 

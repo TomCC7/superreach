@@ -104,7 +104,7 @@ def test_wm_adds_33_frame_batch_after_short_update():
 
 
 def test_native_evaluation_matches_pinned_checkpoint():
-    bundle = json.loads((ROOT / 'web/assets/BUNDLE.json').read_text())
+    bundle = json.loads((ROOT / 'web/robots/openyam/BUNDLE.json').read_text())
     checkpoint = bundle['checkpoints']['e6-submm@20k']
     report = json.loads((ROOT / 'docs/evaluation-data/e6-submm-20k-native.json').read_text())
     assert list(bundle['checkpoints']) == [bundle['default_checkpoint']] == ['e6-submm@20k']

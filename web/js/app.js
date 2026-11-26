@@ -1,3 +1,4 @@
+import {robots,robotId} from './robots.js?v=unified-v1';
 import {arbitrate} from './canvas_drag.js?v=macos-opt-v1';
 import {interactiveView} from './interactive_view.js?v=macos-opt-v1';
 import * as THREE from 'three';
@@ -7,7 +8,7 @@ import {ErrorPlot} from './error_plot.js?v=macos-opt-v1';
 const $=id=>document.getElementById(id),host=$('viewport');
 const plot=new ErrorPlot($('error-chart'));
 const scene=new THREE.Scene();scene.background=new THREE.Color('#e8ede8');
-const camera=new THREE.PerspectiveCamera(39,1,.005,30);camera.up.set(0,0,1);camera.position.set(.95,-1.1,.75);
+const camera=new THREE.PerspectiveCamera(39,1,.005,30);camera.up.set(0,0,1);camera.position.set(-.95,-.755,.75);
 // Avoid multisample resolve/preserved-buffer copies on every interactive frame.
 // In particular, software WebGL otherwise stalls message delivery at ~30 fps.
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});const renderDpr=()=>Math.min(window.devicePixelRatio||1,1.5);renderer.setPixelRatio(renderDpr());renderer.outputColorSpace=THREE.SRGBColorSpace;host.append(renderer.domElement);
@@ -17,7 +18,7 @@ const target=new THREE.Mesh(new THREE.SphereGeometry(.009,20,16),new THREE.MeshS
 const requested=new THREE.Mesh(new THREE.SphereGeometry(.006,16,12),new THREE.MeshBasicMaterial({color:0xdfaa45}));requested.visible=false;scene.add(requested);
 const gizmo=new TransformControls(camera);gizmo.setMode('translate');gizmo.setSize(.72);gizmo.setSpace('world');gizmo.attach(target);scene.add(gizmo.getHelper());gizmo.enabled=false;
 const obstacleHandle=new TransformControls(camera);obstacleHandle.setMode('translate');obstacleHandle.setSize(.59);obstacleHandle.setSpace('world');scene.add(obstacleHandle.getHelper());
-const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(.13,0,.17);orbit.enableDamping=true;orbit.minDistance=.3;orbit.maxDistance=3;orbit.update();
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(-.13,.345,.24);orbit.enableDamping=true;orbit.minDistance=.3;orbit.maxDistance=3;orbit.update();
 
 let geoms=[],lastState=null,ready=false,frames=0,lastFps=performance.now(),renderFrames=0,errors=[],trace=[],targetPending=false,stateDirty=false,targetFrame=null,targetSequence=0,lastTargetId=null;
 const hud={hz:$('worker-hz'),backend:$('webgl-renderer')};
@@ -36,7 +37,7 @@ const interactive=interactiveView(scene,obstacleHandle,send,invalidate);
 arbitrate(renderer.domElement,camera,orbit,[gizmo,obstacleHandle]);
 const setText=(element,value)=>{if(element.textContent!==value)element.textContent=value;};
 const timing=(value,unit)=>Number.isFinite(value)?`${value.toFixed(2)} ${unit}`:'—';
-const worker=new Worker(new URL('./sim_worker.js?v=e6-submm-20k',import.meta.url),{type:'module'}),waiters=new Map();let seq=0;
+const worker=new Worker(new URL('./sim_worker.js?v=unified-v1',import.meta.url),{type:'module'}),waiters=new Map();let seq=0;
 const selector=$('checkpoint'), checkpointStatus=$('checkpoint-status');
 const controlMode=$('control-mode'),tool=$('eef-tool'),jointPanel=$('joint-controls');
 let sliders=[],jointDraft=null,jointPending=0,jointSeq=0;
@@ -53,11 +54,38 @@ function makeSliders(limits){
 }
 function renderJoints(q){sliders.forEach(({input,value},i)=>{input.value=q[i]*deg;const text=`${(q[i]*deg).toFixed(1)}°`;setText(value,text);input.setAttribute('aria-valuetext',`${(q[i]*deg).toFixed(1)} degrees`);});}
 function sendJoints(q){if(lastState?.mode!==2)return;jointDraft=q;renderJoints(q);jointPending=++jointSeq;send({type:'jointTarget',id:jointPending,q,checkpoint:lastState.checkpoint});}
-$('joint-home').onclick=()=>sendJoints([0,1.047,1.047,0,0,0]);
+$('joint-home').onclick=()=>sendJoints(robot.home.slice());
 controlMode.onchange=()=>{controlMode.disabled=true;requested.visible=false;send({type:'mode',mode:Number(controlMode.value)});};
 tool.onchange=()=>{gizmo.axis=null;gizmo.setMode(tool.value);invalidate();};
-const requestedCheckpoint=new URL(location.href).searchParams.get('checkpoint');
-function send(message){worker.postMessage(message);}
+const initialUrl=new URL(location.href);
+const robotSelector=$('robot');
+let robot=robots[robotId(initialUrl.searchParams.get('robot'))];
+function send(message){if(ready||message.type==='init'||message.type==='robot')worker.postMessage({...message,robot:robot.id});}
+function configureRobot(next){
+ ready=false;robot=next;robotSelector.value=next.id;robotSelector.disabled=true;
+ for(const id of ['run','reset','checkpoint','control-mode','preset','payload'])$(id).disabled=true;
+ lastState=null;stateDirty=hudDirty=false;displayError=0;trace=[];plot.clear();
+ if(targetFrame!==null)cancelAnimationFrame(targetFrame);
+ targetFrame=null;targetPending=false;lastTargetId=null;jointDraft=null;jointPending=0;
+ gizmo.enabled=false;gizmo.getHelper().visible=false;requested.visible=false;
+ $('control-mode-card').hidden=true;$('joint-controls').hidden=true;
+ controlMode.value='0';tool.value='translate';$('preset').value='reach';
+ $('joint-sliders').replaceChildren();sliders=[];makeGeoms([]);
+ interactive.reset(next.obstacle);
+ selector.replaceChildren(new Option(next.checkpointLabel,next.checkpoint));checkpointStatus.textContent='';
+ $('payload').replaceChildren(...next.payloads.map(kg=>new Option(`${kg} kg`,kg)));
+ setText($('robot-name'),next.name);setText($('robot-tag'),next.tag);
+ document.title=`SuperReach / ${next.name} Live Sandbox`;
+ $('gains').replaceChildren(...[[`Kp = [${next.kp.join(', ')}]`],[`Kd = [${next.kd.join(', ')}]`],[`Peak torque = [${next.peak.join(', ')}] N·m`]].flatMap(([line],i)=>i?[document.createElement('br'),line]:[line]));
+ setText($('payload-spec'),next.payloadModel);
+ camera.position.fromArray(next.camera);orbit.target.fromArray(next.view);orbit.update();
+ target.visible=false;setText($('status'),`Loading ${next.name}…`);invalidate();
+}
+robotSelector.onchange=()=>{
+ const id=robotId(robotSelector.value);if(id===robot.id)return;
+ const url=new URL(location.href);url.searchParams.set('robot',id);url.searchParams.delete('checkpoint');history.replaceState(null,'',url);
+ configureRobot(robots[id]);send({type:'robot'});
+};
 function request(type,fields={}){return new Promise((resolve,reject)=>{const id=++seq;waiters.set(id,{resolve,reject});send({type,id,...fields});});}
 function fail(message){errors.push(message);$('status').textContent='Error: '+message;console.error(message);for(const w of waiters.values())w.reject(Error(message));waiters.clear();}
 worker.onerror=e=>fail(e.message);
@@ -70,7 +98,8 @@ worker.onmessage=({data:msg})=>{
  if(msg.id&&waiters.has(msg.id)){waiters.get(msg.id).resolve(msg);waiters.delete(msg.id);}
  if(msg.type==='error')fail(msg.message);
  if(msg.type==='progress')$('status').textContent=msg.message;
- if(msg.type==='ready'){makeGeoms(msg.geoms);makeSliders(msg.jointLimits);ready=true;interactive.enable();$('run').disabled=false;$('reset').disabled=false;$('status').textContent='Ready · Drag a handle to take control';$('engine').textContent=`MuJoCo ${msg.version} WASM · JS Float32`;invalidate();}
+ if(msg.robot&&msg.robot!==robot.id)return;
+ if(msg.type==='ready'){makeGeoms(msg.geoms);makeSliders(msg.jointLimits);ready=true;target.visible=true;robotSelector.disabled=controlMode.disabled=$('preset').disabled=$('payload').disabled=false;interactive.enable();$('run').disabled=false;$('reset').disabled=false;$('status').textContent='Ready · Drag a handle to take control';$('engine').textContent=`MuJoCo ${msg.version} WASM · JS Float32`;invalidate();}
  if(msg.type==='target'&&msg.id===lastTargetId){setText($('target-note'),msg.residual_mm===undefined?'Green: Cartesian target':`IK projection: ${msg.residual_mm.toFixed(2)} mm · Green: reachable reference`);targetPending=targetFrame!==null;if(lastState)stateDirty=true;}
  if(msg.type==='state'){
  lastState=msg;stateDirty=hudDirty=true;
@@ -134,4 +163,4 @@ selector.onchange=async()=>{
   const url=new URL(location.href);url.searchParams.set('checkpoint',result.checkpoint);history.replaceState(null,'',url);
  }finally{selector.disabled=false;}
 };
-send({type:'init',checkpoint:requestedCheckpoint});
+configureRobot(robot);send({type:'init',checkpoint:initialUrl.searchParams.get('checkpoint')});

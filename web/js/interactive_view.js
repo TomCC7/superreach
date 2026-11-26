@@ -71,5 +71,13 @@ export function interactiveView(scene,control,send,invalidate){
   if($('torque-sat').textContent!==sat)$('torque-sat').textContent=sat;
  }
  visual(false,shape.value,material.value);syncCoordinates();
- return {obstacle,arrows,pokeArrow,ghost,ghostMaterial,apply,updateHud,enable(){on.disabled=ghostCheck.disabled=false;},get drags(){return drags;}};
+ function reset(home){
+  if(frame!==null)cancelAnimationFrame(frame);
+  frame=null;pending=null;on.checked=ghostCheck.checked=false;
+  shape.value='wall';material.value='rigid';$('poke-target').value='tcp';$('poke-force').value='30';
+  for(const input of [on,shape,material,ghostCheck,pokeButton,...coords])input.disabled=true;
+  obstacle.position.fromArray(home);syncCoordinates();visual(false,'wall','rigid');
+  ghost.visible=pokeArrow.visible=false;arrows.children.forEach(a=>a.visible=false);
+ }
+ return {reset,obstacle,arrows,pokeArrow,ghost,ghostMaterial,apply,updateHud,enable(){on.disabled=ghostCheck.disabled=false;},get drags(){return drags;}};
 }

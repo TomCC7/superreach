@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def build(artifacts, output):
-    bundle = json.loads((ROOT/'web/assets/BUNDLE.json').read_text())
     vendor = json.loads((ROOT/'web/assets/vendor.json').read_text())
 
     def checked(name, digest):
@@ -29,7 +28,8 @@ def build(artifacts, output):
     with TemporaryDirectory(dir=output.parent) as tmp:
         site = Path(tmp)/'site'
         source_files = (
-            'index.html', 'style.css', 'assets/BUNDLE.json',
+            'index.html', 'style.css', 'robots/openyam/BUNDLE.json',
+            'robots/metal-arm/BUNDLE.json', 'robots/metal-arm/LICENSE', 'js/robots.js',
             'js/app.js', 'js/canvas_drag.js', 'js/error_plot.js',
             'js/interaction_config.js', 'js/interactive_physics.js', 'js/interactive_view.js',
             'js/mlp_infer.mjs', 'js/policy.js', 'js/runtime_timing.mjs',
@@ -49,35 +49,29 @@ def build(artifacts, output):
 
         for name, digest in vendor.items():
             stage(name, digest)
-        for name, digest in bundle['files'].items():
-            stage('assets/'+name, digest)
-        for checkpoint in bundle['checkpoints'].values():
-            descriptor = checkpoint['js']
-            info = json.loads(stage(descriptor['path'], descriptor['sha256']))
-            expected_width = {'tri-mode-v2': 318, None: 311}.get(checkpoint.get('abi'))
-            if (expected_width is None or info['input'] != expected_width or info['output'] != 6
-                    or info['onnx_sha256'] != checkpoint['sha256']):
-                raise ValueError('Compiled policy does not match the pinned model or ABI')
-            for field, pattern, key in (('graph', r'graph-[0-9a-f]{20}\.mjs', 'graph_sha256'),
-                                        ('weights', r'weights-[0-9a-f]{20}\.bin', 'sha256')):
-                if not re.fullmatch('models/js/'+pattern, info[field]):
-                    raise ValueError('Invalid compiled policy asset name')
-                stage(info[field], info[key])
-        # The original asset contains build provenance in its compiler path.
-        # Normalize it only after validating the pinned original asset.
-        scene = site/'assets/scene.xml'
-        source, count = re.subn(r'\bmeshdir="[^"]*"', 'meshdir="meshes"', scene.read_text())
-        if count != 1:
-            raise ValueError('Expected one scene compiler mesh path')
-        scene.write_text(source)
-        bundle['files']['scene.xml'] = sha256(scene.read_bytes()).hexdigest()
-        (site/'assets/BUNDLE.json').write_text(json.dumps(bundle, indent=2)+'\n')
+        for robot in ('openyam', 'metal-arm'):
+            base = 'robots/' + robot
+            bundle = json.loads((site/base/'BUNDLE.json').read_text())
+            for name, digest in bundle['files'].items():
+                stage(base+'/'+name, digest)
+            for checkpoint in bundle['checkpoints'].values():
+                descriptor = checkpoint['js']
+                info = json.loads(stage(descriptor['path'], descriptor['sha256']))
+                expected_width = {'tri-mode-v2': 318, None: 311}.get(checkpoint.get('abi'))
+                if (expected_width is None or info['input'] != expected_width or info['output'] != 6
+                        or info['onnx_sha256'] != checkpoint['sha256']):
+                    raise ValueError('Compiled policy does not match the pinned model or ABI')
+                for field, pattern, key in (('graph', r'graph-[0-9a-f]{20}\.mjs', 'graph_sha256'),
+                                            ('weights', r'weights-[0-9a-f]{20}\.bin', 'sha256')):
+                    if not re.fullmatch('models/js/'+pattern, info[field]):
+                        raise ValueError('Invalid compiled policy asset name')
+                    stage(info[field], info[key])
         site.rename(output)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--artifacts', type=Path, required=True, help='Directory with assets/, models/js/ and vendor/')
+    ap.add_argument('--artifacts', type=Path, required=True, help='Directory with robots/, models/js/ and vendor/')
     ap.add_argument('--output', type=Path, required=True)
     args = ap.parse_args()
     try:

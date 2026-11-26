@@ -75,8 +75,10 @@ with sync_playwright() as pw:
     wait(f'demo.state.goal.slice(3).some((x,i)=>Math.abs(x-({old[3:]})[i])>.02)')
     rotated=js('demo.state.goal');assert diff(rotated[:3],old[:3])<1e-9,(old,rotated)
     rows=js('demo.getTrace().then(x=>x.trace)');assert set(r['mode'] for r in rows)=={0,1,2}
-    bundle=page.request.get(BASE+'/assets/BUNDLE.json').json()
-    ent=bundle['checkpoints'][ID] if 'checkpoints' in bundle else bundle['policy']
+    manifest=page.request.get(BASE+'/robots/openyam/BUNDLE.json')
+    assert manifest.ok, manifest.status
+    bundle=manifest.json()
+    ent=bundle['checkpoints'][ID]
     assert js('demo.state.backend') == 'JS Float32'
     weights=args.onnx.read_bytes();assert hashlib.sha256(weights).hexdigest()==ent.get('sha256',ent.get('source_sha256'))
     opts=ort.SessionOptions();opts.intra_op_num_threads=1;cpu=ort.InferenceSession(weights,opts,providers=['CPUExecutionProvider'])

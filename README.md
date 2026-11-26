@@ -10,14 +10,16 @@ SuperReach is a learned 50 Hz controller for tracking arm goals on OpenYAM in si
 
 - One 50 Hz policy tracks **EEF 6D** (position and orientation), **XYZ-only** (position), or **Joint 6D** (joint angles).
 - The policy sends six absolute joint positions, `q_des`, directly to the simulator's position actuators without an output clamp, an interpolator, or external inverse kinematics.
-- Training accounts for sensor bias, noise, and command delays from 0 to 10 ms. The browser demo supports simulated payloads from 0 to 2 kg.
-- The browser deploys `e6-submm@20k`: a history-based system identification policy refined with 33-frame world-model supervision and a smooth fine-position reward. Policy inference runs in JavaScript and physics runs in MuJoCo WASM, with no inference backend.
+- The browser runs `e6-submm@20k` in JavaScript with MuJoCo WASM, no inference server, and simulated payloads from 0 to 2 kg.
+- In clean native MuJoCo HOME holds, mean tool-center-point (TCP) error after the first second was **0.72 mm** for EEF 6D and **0.38 mm** for XYZ-only. These stationary results cover four payloads per mode. The evaluator recorded **0 physical failures across 129 case/mode runs**. See the [evaluation protocol and raw results](docs/evaluation.md); these are simulation results, not hardware validation or moving-target error bounds.
 
 ## Model architecture
 
-![SuperReach policy architecture](docs/architecture.png)
+![E6 sub-mm 20k actor: causal history, online SysID, and two goal encoders feed a shared decoder; the DR head and world model are training-only](docs/architecture.png)
 
-Separate Cartesian and joint encoders handle the goal inputs. A history encoder reads 16 ticks of measured joint positions, velocities, and prior commands. The shared decoder combines the history and goal encodings to produce `q_des`.
+- **Online system identification (SysID):** A 16-tick history holds measured joint positions and velocities, previous issued commands, and a validity bit (`16 × 19`). The history encoder maps it to a **16D latent**. A training-only auxiliary head regularizes this latent by predicting **71D** of privileged domain-randomization (DR) context: payload inertial properties, link and actuator dynamics, and command delay. Neither the head nor its targets are used at inference.
+- **Goal conditioning:** The Cartesian encoder uses forward kinematics to compute the 7D input `[position error / 0.5, rotation error / π, rotation mask]`. XYZ-only zeros the rotation error. The joint encoder takes six joint-angle errors divided by π. Both encoders use a 64-unit hidden layer and produce layer-normalized **32D** embeddings. The mode selects one; the shared decoder takes **66D** (18D of normalized current joint state and previous command, 16D SysID, 32D goal) and outputs six absolute `q_des` positions at 50 Hz.
+- **Training:** The differentiable world model uses **8-frame** short-window supervision plus **33-frame** long-window supervision (one initial frame and 32 open-loop steps), matching the policy's 32-step training rollout. A smooth Cartesian fine-position bonus, `exp(−(position error / 2 mm)²)`, rewards small errors without a hard 2 mm cutoff. Training also includes sensor bias, noise, and 0–10 ms command delay.
 
 ## Quickstart
 

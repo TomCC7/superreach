@@ -1,6 +1,6 @@
 # Local artifacts
 
-The Git checkout contains source code. If you have access to the linked Space, you can open the interactive demo without a local setup. For a local build, set `ARTIFACTS` to a directory containing the exact inputs listed in `web/assets/BUNDLE.json` and `web/assets/vendor.json`:
+The Git checkout contains source code, not model weights. The [public Space](https://huggingface.co/spaces/playercc7/superreach) runs `e6-submm@20k` without local setup, ONNX, or ONNX Runtime Web. For a local build, set `ARTIFACTS` to a directory containing the exact inputs listed in `web/assets/BUNDLE.json` and `web/assets/vendor.json`:
 
 - `assets/scene.xml` and `assets/meshes/` contain the 2 ms OpenYAM MuJoCo plant and its meshes. Set `SCENE="$ARTIFACTS/assets/scene.xml"` for the Python commands. The plant loads meshes relative to the scene.
 - `models/js/` contains the pinned descriptors, JavaScript graphs, and binary weights. The build verifies descriptors and their graph/weight digests. Do not copy private checkpoints into the site directory.
@@ -12,10 +12,10 @@ The Python export command expects a tensor-only PyTorch actor state dictionary o
 
 `python tools/export_onnx_to_jsbin.py LOCAL_SITE` compiles compatible ONNX files in a scratch site tree with `assets/BUNDLE.json` and `models/`. It validates each ONNX digest and ABI, writes content-addressed descriptors, graphs, and float32 weights, and updates the scratch manifest. The static builder is for the matching pinned demo artifacts. A custom policy needs its own manifest and selector entry.
 
-For the browser test, install `playwright` and its Chromium browser in the verification environment. Serve the assembled site and run:
+For the browser test, install `playwright` and its Chromium browser in the verification environment. The test also needs a separately supplied, hash-matched ONNX export for the CPU reference. Do not serve or commit it. Serve the assembled site and run:
 
 ```sh
-python tests/browser_smoke.py --onnx "$ARTIFACTS/models/policy_trimode_dual_enc_10ms_13500.onnx"
+python tests/browser_smoke.py --onnx "$ARTIFACTS/models/policy_e6_submm_20k.onnx"
 ```
 
 To refresh the README preview, pass `--screenshot docs/preview.png` and review the image before committing it. Keep runtime assets out of the source release.

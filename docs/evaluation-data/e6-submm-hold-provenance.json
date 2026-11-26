@@ -1,0 +1,11 @@
+{
+  "native_report_sha256": {
+    "pre": "9324436e186a407e13fea7b9cdcfa1373ed66f196c5fe4111790b5401b46d90c",
+    "post": "5f9ff6b1aafa752cc10964aee7b3dedcb3a6a54c892781c5c41a3fd3b9c3e220"
+  },
+  "checkpoint_sha256": {
+    "pre": "0850ea7dde86827b5305acb8f4ed094b8c09dbdd3cd3dd00ab49261ae8df7f2f",
+    "post": "9c965cc28c88f9eed9e420a056e47af05b9c9be8031d03acc30ef63b56d961f9"
+  },
+  "control_dt_s": 0.02
+}

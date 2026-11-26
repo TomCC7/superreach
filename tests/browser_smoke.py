@@ -12,17 +12,18 @@ parser.add_argument('--chromium', type=Path)
 parser.add_argument('--screenshot', type=Path)
 args = parser.parse_args()
 BASE = args.url.rstrip('/')
-ID='tri-mode-dual-enc@13.5k'
+ID='e6-submm@20k'
 
 def diff(a,b): return max(abs(x-y) for x,y in zip(a,b,strict=True))
 
 with sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path=args.chromium,headless=True,args=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox'])
-    page=browser.new_page(viewport={'width':1440,'height':1000});errors=[]
+    page=browser.new_page(viewport={'width':1440,'height':1000});errors=[];requested=[]
+    page.on('request',lambda r:requested.append(r.url))
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
     page.on('response',lambda r:errors.append(f'{r.status} {r.url}') if r.status>=400 else None)
-    page.goto(BASE+'/?v=trimode-v1');page.bring_to_front()
+    page.goto(BASE+'/?v=e6-submm-20k');page.bring_to_front()
     wait=lambda e:page.wait_for_function(e,timeout=15000)
     js=page.evaluate
     wait(f'demo.state?.tick>8 && demo.state.checkpoint==={json.dumps(ID)} && demo.state.tri && demo.state.mode===0')
@@ -74,8 +75,10 @@ with sync_playwright() as pw:
     wait(f'demo.state.goal.slice(3).some((x,i)=>Math.abs(x-({old[3:]})[i])>.02)')
     rotated=js('demo.state.goal');assert diff(rotated[:3],old[:3])<1e-9,(old,rotated)
     rows=js('demo.getTrace().then(x=>x.trace)');assert set(r['mode'] for r in rows)=={0,1,2}
-    bundle=page.request.get(BASE+'/assets/BUNDLE.json').json();ent=bundle['checkpoints'][ID]
-    weights=args.onnx.read_bytes();assert hashlib.sha256(weights).hexdigest()==ent['sha256']
+    bundle=page.request.get(BASE+'/assets/BUNDLE.json').json()
+    ent=bundle['checkpoints'][ID] if 'checkpoints' in bundle else bundle['policy']
+    assert js('demo.state.backend') == 'JS Float32'
+    weights=args.onnx.read_bytes();assert hashlib.sha256(weights).hexdigest()==ent.get('sha256',ent.get('source_sha256'))
     opts=ort.SessionOptions();opts.intra_op_num_threads=1;cpu=ort.InferenceSession(weights,opts,providers=['CPUExecutionProvider'])
     maxima={i:0. for i in range(3)}
     for prev,row in zip([None]+rows,rows):
@@ -90,11 +93,14 @@ with sync_playwright() as pw:
         assert np.isfinite(np.r_[q,row['q'],row['dq'],row['tcp']]).all()
         maxima[mode]=max(maxima[mode],float(np.abs(cpu.run(None,{'obs':obs})[0][0]-q).max()))
     assert max(maxima.values())<1e-5,maxima
-    # Exercise every retained checkpoint through the real selector, then return to Group B.
-    for cid in [k for k in bundle['checkpoints'] if k!=ID]+[ID]:
-        page.locator('#checkpoint').select_option(cid)
-        wait(f'demo.state.checkpoint==={json.dumps(cid)} && demo.state.tick>2 && !document.querySelector("#checkpoint").disabled')
-        assert page.locator('#control-mode-card').is_visible()==(cid==ID)
+    # Verify the sole checkpoint in either the source build or the static Space.
+    if 'checkpoints' in bundle:
+        assert list(bundle['checkpoints']) == [bundle['default_checkpoint']] == [ID]
+        assert page.locator('#checkpoint option').count() == 1
+    else:
+        assert ent['id'] == ID and page.locator('#checkpoint').count() == 0
+    forbidden = [u for u in requested if '.onnx' in u.lower() or '/vendor/ort/' in u.lower() or 'onnxruntime' in u.lower()]
+    assert not forbidden,forbidden
     assert js('window.browserErrors.concat(demo.errors)')==[] and errors==[],errors
-    data=dict(chromium=browser.version,frames=len(rows),browser_cpu_max_abs_rad=maxima,switch_ticks=[t_xyz,t_joint,t_eef],xyz_error_mm=[xyz_error*1000,xyz_final*1000],joint_deg=[math.degrees(x) for x in [start,goal,final]],errors=errors)
+    data=dict(chromium=browser.version,frames=len(rows),browser_cpu_max_abs_rad=maxima,switch_ticks=[t_xyz,t_joint,t_eef],xyz_error_mm=[xyz_error*1000,xyz_final*1000],joint_deg=[math.degrees(x) for x in [start,goal,final]],errors=errors,ort_onnx_requests=len(forbidden))
     print(json.dumps(data,indent=2));browser.close()

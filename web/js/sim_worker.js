@@ -2,8 +2,8 @@ import {Interactions,obstacleXml} from './interactive_physics.js?v=macos-opt-v1'
 import {TraceRing,nextDeadline,geomSnapshot,copyGeoms} from './runtime_timing.mjs?v=macos-opt-v1';
 let interactions;
 import loadMujoco from '../vendor/mujoco/mujoco.js';
-import {Float32Engine} from './mlp_infer.mjs?v=js-f32-v1';
-import {Policy,KP,KD,HOME,DT} from './policy.js?v=js-f32-v1';
+import {Float32Engine} from './mlp_infer.mjs?v=e6-submm-20k';
+import {Policy,KP,KD,HOME,DT} from './policy.js?v=e6-submm-20k';
 import {periodicReference} from './trajectories.js?v=scheme1-14k-v1';
 let mj,m,d,ref,policy,tcp,xml,ready=false,running=false,busy=false,timer,trace,geomsFrame,qref=HOME.slice(),preset='reach',payload=0;
 const SUBSTEPS=10, PHYSICS_DT=0.002;
@@ -27,7 +27,7 @@ function sampleTick(now){
 }
 const send=(type,fields={})=>postMessage({type,...fields});
 const arr=(a)=>Array.from(a);
-async function bytes(path){const r=await fetch(new URL('../'+path+'?v=js-f32-v1',import.meta.url));if(!r.ok)throw Error(`${path}: HTTP ${r.status}`);return new Uint8Array(await r.arrayBuffer());}
+async function bytes(path){const r=await fetch(new URL('../'+path+'?v=e6-submm-20k',import.meta.url));if(!r.ok)throw Error(`${path}: HTTP ${r.status}`);return new Uint8Array(await r.arrayBuffer());}
 async function checked(path,expected){const b=await bytes(path);if(expected&&globalThis.crypto?.subtle?.digest){const hash=arr(new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256',b))).map(x=>x.toString(16).padStart(2,'0')).join('');if(hash!==expected)throw Error('Hash mismatch '+path);}return b;}
 function pose(data=ref){return [...data.xpos.slice(3*tcp,3*tcp+3),...data.xquat.slice(4*tcp,4*tcp+4)];}
 function fk(q){ref.qpos.set(q,0);mj.mj_kinematics(m,ref);return pose();}
@@ -213,11 +213,11 @@ async function loadPolicy(id){
  if(descriptor){
   if(!/^models\/js\/policy-[0-9a-f]{20}\.graph\.json$/.test(descriptor.path))throw Error('Invalid JS checkpoint path');
   const artifact=JSON.parse(new TextDecoder().decode(await checked(descriptor.path,descriptor.sha256)));
-  if(artifact.onnx_sha256!==sha256||artifact.input!==width||
+  if(artifact.onnx_sha256!==sha256||artifact.input!==width||artifact.output!==6||
      !/^models\/js\/graph-[0-9a-f]{20}\.mjs$/.test(artifact.graph)||
      !/^models\/js\/weights-[0-9a-f]{20}\.bin$/.test(artifact.weights))throw Error('Invalid JS checkpoint manifest');
   const [{forward},weights]=await Promise.all([
-   import(new URL('../'+artifact.graph,import.meta.url).href),checked(artifact.weights,artifact.sha256)
+   import(new URL('../'+artifact.graph,import.meta.url).href),checked(artifact.weights,artifact.sha256),checked(artifact.graph,artifact.graph_sha256)
   ]);
   engine=new Float32Engine(artifact,forward,weights);engine.backend='JS Float32';engine.async=false;
  }else{throw Error('Missing compiled JS policy descriptor');}
@@ -240,7 +240,7 @@ async function selectCheckpoint(id,requestId){
  send('checkpointDone',{id:requestId,checkpoint:activeCheckpoint});
 }
 async function init(requested){send('progress',{message:'Loading MuJoCo WASM and policy…'});mj=await loadMujoco();interactions=new Interactions(mj);
- const bundle=await (await fetch(new URL('../assets/BUNDLE.json?v=js-f32-v1',import.meta.url))).json();mj.FS.mkdirTree('/openyam/meshes');
+ const bundle=await (await fetch(new URL('../assets/BUNDLE.json?v=e6-submm-20k',import.meta.url))).json();mj.FS.mkdirTree('/openyam/meshes');
  const entries=Object.entries(bundle.files);await Promise.all(entries.filter(([n])=>n.startsWith('meshes/')).map(async([name,hash])=>mj.FS.writeFile('/openyam/'+name,await checked('assets/'+name,hash))));
  xml=new TextDecoder().decode(await checked('assets/scene.xml',bundle.files['scene.xml']));
  checkpoints=bundle.checkpoints;

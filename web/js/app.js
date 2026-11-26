@@ -36,7 +36,7 @@ const interactive=interactiveView(scene,obstacleHandle,send,invalidate);
 arbitrate(renderer.domElement,camera,orbit,[gizmo,obstacleHandle]);
 const setText=(element,value)=>{if(element.textContent!==value)element.textContent=value;};
 const timing=(value,unit)=>Number.isFinite(value)?`${value.toFixed(2)} ${unit}`:'—';
-const worker=new Worker(new URL('./sim_worker.js?v=macos-opt-v1',import.meta.url),{type:'module'}),waiters=new Map();let seq=0;
+const worker=new Worker(new URL('./sim_worker.js?v=e6-submm-20k',import.meta.url),{type:'module'}),waiters=new Map();let seq=0;
 const selector=$('checkpoint'), checkpointStatus=$('checkpoint-status');
 const controlMode=$('control-mode'),tool=$('eef-tool'),jointPanel=$('joint-controls');
 let sliders=[],jointDraft=null,jointPending=0,jointSeq=0;
@@ -70,7 +70,7 @@ worker.onmessage=({data:msg})=>{
  if(msg.id&&waiters.has(msg.id)){waiters.get(msg.id).resolve(msg);waiters.delete(msg.id);}
  if(msg.type==='error')fail(msg.message);
  if(msg.type==='progress')$('status').textContent=msg.message;
- if(msg.type==='ready'){makeGeoms(msg.geoms);makeSliders(msg.jointLimits);ready=true;interactive.enable();$('run').disabled=false;$('reset').disabled=false;$('status').textContent='Ready · Drag a handle to take control';$('engine').textContent=`MuJoCo ${msg.version} · ORT Web 1.22 · WASM`;invalidate();}
+ if(msg.type==='ready'){makeGeoms(msg.geoms);makeSliders(msg.jointLimits);ready=true;interactive.enable();$('run').disabled=false;$('reset').disabled=false;$('status').textContent='Ready · Drag a handle to take control';$('engine').textContent=`MuJoCo ${msg.version} WASM · JS Float32`;invalidate();}
  if(msg.type==='target'&&msg.id===lastTargetId){setText($('target-note'),msg.residual_mm===undefined?'Green: Cartesian target':`IK projection: ${msg.residual_mm.toFixed(2)} mm · Green: reachable reference`);targetPending=targetFrame!==null;if(lastState)stateDirty=true;}
  if(msg.type==='state'){
  lastState=msg;stateDirty=hudDirty=true;

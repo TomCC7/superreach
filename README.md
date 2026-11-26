@@ -2,7 +2,7 @@
 
 SuperReach is a learned 50 Hz controller for tracking arm goals on OpenYAM in simulation.
 
-[Live Demo](https://huggingface.co/spaces/playercc7/superreach) (requires Space access) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data)
+[Live Demo](https://huggingface.co/spaces/playercc7/superreach) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data) · [Evaluation](docs/evaluation.md)
 
 ![SuperReach browser simulator](docs/preview.png)
 
@@ -11,7 +11,7 @@ SuperReach is a learned 50 Hz controller for tracking arm goals on OpenYAM in si
 - One 50 Hz policy tracks **EEF 6D** (position and orientation), **XYZ-only** (position), or **Joint 6D** (joint angles).
 - The policy sends six absolute joint positions, `q_des`, directly to the simulator's position actuators without an output clamp, an interpolator, or external inverse kinematics.
 - Training accounts for sensor bias, noise, and command delays from 0 to 10 ms. The browser demo supports simulated payloads from 0 to 2 kg.
-- The browser runs policy inference in JavaScript and physics in MuJoCo WASM, with no inference backend.
+- The browser deploys `e6-submm@20k`: a history-based system identification policy refined with 33-frame world-model supervision and a smooth fine-position reward. Policy inference runs in JavaScript and physics runs in MuJoCo WASM, with no inference backend.
 
 ## Model architecture
 

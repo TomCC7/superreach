@@ -22,4 +22,14 @@ The downloader fetches only the [SuperReach dataset](https://huggingface.co/data
 
 For data admission without allocating GPU memory, add `--check-data` to the training command. The launcher verifies the registered scene, payload catalog and trajectory manifest by SHA-256 and checks that all referenced shards exist. The learner verifies each shard's digest when it loads the bank. The XML's mesh directory is relocated only in a temporary copy. Use `CUDA_VISIBLE_DEVICES` to choose the GPU, and keep at least 12 GiB free for checkpoint writes.
 
-The default run starts cold with 4,096 worlds, 256 world-model samples per minibatch and 512 actor starts per update. It uses ten 2 ms physics substeps per control tick, sensor noise and bias, 0–10 ms command delay, payload randomization up to 2 kg, and a 32-tick differentiable actor rollout. `--arch masked` selects the alternative goal encoder. Control the run budget with `--updates` and RNG initialization with `--seed`. The run directory must be new and receives metrics, checkpoints and native MuJoCo evaluations. See [data generation](../data_gen/README.md) for the separate generator workflow.
+The portable CLI starts a **fresh baseline** with 4,096 worlds, 256 world-model samples per minibatch and 512 actor starts per update. It does not restore or recreate the published E6 checkpoint. It uses ten 2 ms physics substeps per control tick, sensor noise and bias, 0–10 ms command delay, payload randomization up to 2 kg, and a 32-tick differentiable actor rollout. `--arch masked` selects the alternative goal encoder. Control the run budget with `--updates` and RNG initialization with `--seed`. The run directory must be new and receives metrics, checkpoints and native MuJoCo evaluations. See [data generation](../data_gen/README.md) for the separate generator workflow.
+
+## Published E6 recipe
+
+The demo's 20k policy continued the 15k E6 actor for 5,000 updates. The [recipe source](../gpu_train/runtime/openyam-50hz-policyik-eef-v1/e6_submm/) includes the actor, randomized plant parameters and learner hooks, with the effective run settings in `recipe.json`:
+
+- A 16-frame history encoder predicts a 16D latent. A training-only auxiliary head regresses 71 normalized domain parameters (payload, hardware and delay) with MSE weight 0.01. The deployed actor does not take privileged parameters as inputs.
+- Keep the existing 8-frame world-model pass and add a 33-frame, 32-transition open-loop pass using recorded effective commands. Of each 64-window long batch, 48 windows are unconditioned and 16 are selected for low peak joint speed. Reject reset-crossing windows rather than using terminal padding.
+- Use a smooth position penalty and an ungated `exp(-‖Δp‖² / (2 mm)²)` bonus, weighted 1.5 in EEF and 2.0 in XYZ. Regularize joint speed, joint acceleration and issued-command slew. Actor LR decays from `5e-5` to `5e-6` on the continuation clock; critic and world-model LRs stay at `2e-4`.
+
+These source hooks have component tests on CPU. The historical full-state checkpoint and its restore launcher are not distributed or exercised here. See [evaluation](evaluation.md) for native results.

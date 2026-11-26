@@ -54,6 +54,10 @@ def build(artifacts, output):
         for checkpoint in bundle['checkpoints'].values():
             descriptor = checkpoint['js']
             info = json.loads(stage(descriptor['path'], descriptor['sha256']))
+            expected_width = {'tri-mode-v2': 318, None: 311}.get(checkpoint.get('abi'))
+            if (expected_width is None or info['input'] != expected_width or info['output'] != 6
+                    or info['onnx_sha256'] != checkpoint['sha256']):
+                raise ValueError('Compiled policy does not match the pinned model or ABI')
             for field, pattern, key in (('graph', r'graph-[0-9a-f]{20}\.mjs', 'graph_sha256'),
                                         ('weights', r'weights-[0-9a-f]{20}\.bin', 'sha256')):
                 if not re.fullmatch('models/js/'+pattern, info[field]):

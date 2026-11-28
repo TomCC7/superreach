@@ -2,7 +2,7 @@
 
 SuperReach is a learned 50 Hz controller for tracking arm goals in simulation. The unified browser sandbox runs **OpenYAM** and **MakerMods Metal Arm** with live switching and no page reload.
 
-[Live Demo](https://huggingface.co/spaces/playercc7/superreach) · [Open Metal Arm directly](https://playercc7-superreach.static.hf.space/?robot=metal-arm) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data) · [Evaluation](docs/evaluation.md)
+[Live Demo](https://huggingface.co/spaces/playercc7/superreach) · [Write-up](https://tomcc7.github.io/projects/superreach/) · [Open Metal Arm directly](https://playercc7-superreach.static.hf.space/?robot=metal-arm) · [Training Dataset](https://huggingface.co/datasets/playercc7/superreach-data) · [Evaluation](docs/evaluation.md)
 
 ![SuperReach browser simulator with MakerMods Metal Arm selected](docs/preview-metal-arm.png)
 
